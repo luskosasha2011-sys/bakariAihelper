@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLIPRADAR — Агрегатор вигідних пропозицій</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0A0A0C;
+  --bg2:#111114;
+  --bg3:#18181C;
+  --surface:#1E1E24;
+  --surface2:#26262E;
+  --border:#2A2A34;
+  --border2:#35354A;
+  --text:#E8E6E0;
+  --text2:#9896A0;
+  --text3:#5E5C68;
+  --green:#00E676;
+  --green2:#00C853;
+  --green-bg:rgba(0,230,118,.08);
+  --green-border:rgba(0,230,118,.2);
+  --red:#FF5252;
+  --amber:#FFD740;
+  --amber-bg:rgba(255,215,64,.08);
+  --blue:#448AFF;
+  --blue-bg:rgba(68,138,255,.08);
+  --hot:linear-gradient(135deg,#FF6D00,#FF1744);
+  --font:'Outfit',sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+  --radius:8px;
+  --radius-lg:14px;
+  --ease:cubic-bezier(.4,0,.2,1);
+}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.5;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ══════ GRAIN OVERLAY ══════ */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  opacity:.03;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ══════ HEADER ══════ */
+.header{
+  position:sticky;top:0;z-index:100;
+  padding:0 24px;height:60px;
+  display:flex;align-items:center;
+  background:rgba(10,10,12,.85);
+  backdrop-filter:blur(20px) saturate(1.4);
+  border-bottom:1px solid var(--border);
+}
+.logo{
+  font-weight:800;font-size:20px;letter-spacing:-1px;
+  display:flex;align-items:center;gap:8px;
+  color:var(--text);text-decoration:none;flex-shrink:0;
+}
+.logo-dot{
+  width:10px;height:10px;border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 12px rgba(0,230,118,.5);
+  animation:pulse 2s infinite;
+}
+@keyframes pulse{
+  0%,100%{opacity:1;transform:scale(1)}
+  50%{opacity:.6;transform:scale(.85)}
+}
+.logo span{color:var(--green)}
+.header-nav{
+  display:flex;align-items:center;gap:4px;
+  margin-left:32px;
+}
+.nav-btn{
+  padding:6px 14px;border-radius:6px;
+  font:500 13px var(--font);color:var(--text2);
+  background:transparent;border:none;cursor:pointer;
+  transition:.2s var(--ease);
+}
+.nav-btn:hover,.nav-btn.active{color:var(--text);background:var(--surface)}
+.header-right{
+  margin-left:auto;display:flex;align-items:center;gap:8px;
+}
+.scan-btn{
+  padding:8px 18px;border-radius:8px;
+  font:600 13px var(--font);
+  background:var(--green);color:#000;
+  border:none;cursor:pointer;
+  display:flex;align-items:center;gap:6px;
+  transition:.2s var(--ease);
+}
+.scan-btn:hover{background:var(--green2);transform:translateY(-1px)}
+.scan-btn .spinner{
+  width:14px;height:14px;border:2px solid rgba(0,0,0,.2);
+  border-top-color:#000;border-radius:50%;
+  animation:spin .6s linear infinite;display:none;
+}
+.scan-btn.loading .spinner{display:block}
+.scan-btn.loading .scan-text{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ══════ STATUS BAR ══════ */
+.status-bar{
+  padding:10px 24px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:20px;
+  font:400 12px var(--mono);color:var(--text3);
+  overflow-x:auto;white-space:nowrap;
+}
+.status-item{display:flex;align-items:center;gap:6px}
+.status-dot{
+  width:6px;height:6px;border-radius:50%;flex-shrink:0;
+}
+.status-dot.online{background:var(--green);box-shadow:0 0 6px rgba(0,230,118,.5)}
+.status-dot.offline{background:var(--red)}
+.status-dot.slow{background:var(--amber)}
+
+/* ══════ MAIN LAYOUT ══════ */
+.main{max-width:1440px;margin:0 auto;padding:20px 24px 60px}
+
+/* ══════ SOURCES PANEL ══════ */
+.sources-section{margin-bottom:28px}
+.section-label{
+  font:600 11px var(--mono);
+  color:var(--text3);letter-spacing:1.5px;
+  text-transform:uppercase;margin-bottom:12px;
+}
+.sources-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+  gap:8px;
+}
+.source-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:12px 14px;
+  display:flex;align-items:center;gap:10px;
+  cursor:pointer;transition:.2s var(--ease);
+  position:relative;overflow:hidden;
+}
+.source-card:hover{border-color:var(--border2);background:var(--surface2)}
+.source-card.active{border-color:var(--green-border);background:var(--green-bg)}
+.source-card.active::before{
+  content:'';position:absolute;top:0;left:0;width:3px;height:100%;
+  background:var(--green);
+}
+.source-icon{
+  width:32px;height:32px;border-radius:6px;
+  background:var(--bg3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;flex-shrink:0;
+}
+.source-info{flex:1;min-width:0}
+.source-name{font:600 13px var(--font);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.source-country{font:400 11px var(--mono);color:var(--text3)}
+.source-check{
+  width:18px;height:18px;border-radius:4px;
+  border:1.5px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;color:transparent;transition:.15s;flex-shrink:0;
+}
+.source-card.active .source-check{
+  background:var(--green);border-color:var(--green);color:#000;
+}
+
+/* ══════ SEARCH CONFIG ══════ */
+.search-config{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:20px;margin-bottom:24px;
+}
+.config-row{
+  display:flex;gap:12px;flex-wrap:wrap;align-items:end;
+}
+.config-field{flex:1;min-width:180px}
+.config-field label{
+  display:block;font:500 12px var(--mono);
+  color:var(--text3);margin-bottom:6px;
+  text-transform:uppercase;letter-spacing:.5px;
+}
+.config-input{
+  width:100%;padding:10px 14px;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);color:var(--text);
+  font:400 14px var(--font);transition:.2s;
+}
+.config-input:focus{outline:none;border-color:var(--green-border)}
+.config-select{
+  width:100%;padding:10px 14px;
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);color:var(--text);
+  font:400 14px var(--font);cursor:pointer;
+}
+.config-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.c-chip{
+  padding:5px 12px;border-radius:20px;
+  font:500 12px var(--font);
+  border:1px solid var(--border);
+  color:var(--text2);cursor:pointer;
+  transition:.15s;background:transparent;
+}
+.c-chip:hover{border-color:var(--text3);color:var(--text)}
+.c-chip.active{background:var(--green);border-color:var(--green);color:#000;font-weight:600}
+
+/* ══════ RESULTS ══════ */
+.results-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:16px;flex-wrap:wrap;gap:10px;
+}
+.results-title{font:700 18px var(--font);letter-spacing:-.3px}
+.results-count{
+  font:400 13px var(--mono);color:var(--text3);
+  background:var(--surface);padding:4px 12px;
+  border-radius:20px;border:1px solid var(--border);
+}
+.results-sort{
+  display:flex;align-items:center;gap:8px;
+}
+.sort-btn{
+  padding:6px 12px;border-radius:6px;
+  font:500 12px var(--font);
+  border:1px solid var(--border);
+  background:transparent;color:var(--text2);
+  cursor:pointer;transition:.15s;
+}
+.sort-btn:hover,.sort-btn.active{
+  border-color:var(--green-border);color:var(--green);background:var(--green-bg);
+}
+
+/* ══════ DEAL CARDS ══════ */
+.deals-list{display:flex;flex-direction:column;gap:12px}
+.deal-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  gap:0;overflow:hidden;
+  transition:.2s var(--ease);
+  position:relative;
+}
+.deal-card:hover{
+  border-color:var(--border2);
+  box-shadow:0 4px 24px rgba(0,0,0,.3);
+  transform:translateY(-1px);
+}
+.deal-card.hot-deal{border-color:rgba(255,23,68,.3)}
+.deal-card.hot-deal::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,109,0,.03),rgba(255,23,68,.03));
+  pointer-events:none;
+}
+
+/* Profit sidebar */
+.deal-profit-bar{
+  width:80px;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:16px 8px;
+  border-right:1px solid var(--border);
+  text-align:center;
+}
+.profit-pct{
+  font:800 22px var(--font);
+  letter-spacing:-1px;
+}
+.profit-pct.high{color:var(--green)}
+.profit-pct.medium{color:var(--amber)}
+.profit-pct.low{color:var(--text3)}
+.profit-label{
+  font:500 9px var(--mono);
+  color:var(--text3);text-transform:uppercase;
+  letter-spacing:.5px;margin-top:2px;
+}
+.deal-badge{
+  padding:3px 8px;border-radius:4px;
+  font:700 9px var(--mono);
+  text-transform:uppercase;letter-spacing:.5px;
+  margin-top:8px;
+}
+.badge-hot{background:var(--hot);color:#fff}
+.badge-flip{background:var(--blue);color:#fff}
+.badge-rare{background:rgba(156,39,176,.8);color:#fff}
+
+/* Main content */
+.deal-main{padding:16px 20px;min-width:0}
+.deal-top{
+  display:flex;align-items:flex-start;gap:12px;margin-bottom:8px;
+}
+.deal-source-tag{
+  padding:2px 8px;border-radius:4px;
+  font:600 10px var(--mono);
+  text-transform:uppercase;
+  flex-shrink:0;
+}
+.tag-olx{background:rgba(0,166,80,.15);color:#00A650}
+.tag-prom{background:rgba(255,111,0,.15);color:#FF6F00}
+.tag-ria{background:rgba(33,150,243,.15);color:#2196F3}
+.tag-kleinanzeigen{background:rgba(104,159,56,.15);color:#689F38}
+.tag-mascus{background:rgba(255,193,7,.15);color:#FFC107}
+.tag-machineseeker{background:rgba(183,28,28,.15);color:#E53935}
+.tag-trademachines{background:rgba(63,81,181,.15);color:#7986CB}
+.tag-surplex{background:rgba(0,150,136,.15);color:#009688}
+.tag-maschinensucher{background:rgba(233,30,99,.15);color:#E91E63}
+.tag-werktuigen{background:rgba(121,85,72,.15);color:#8D6E63}
+.deal-title{
+  font:600 15px var(--font);
+  color:var(--text);
+  flex:1;min-width:0;
+  display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;
+}
+.deal-specs{
+  font:400 12px var(--mono);
+  color:var(--text3);margin-bottom:10px;
+  display:-webkit-box;-webkit-line-clamp:1;
+  -webkit-box-orient:vertical;overflow:hidden;
+}
+.deal-prices{
+  display:flex;align-items:baseline;gap:12px;
+  margin-bottom:8px;
+}
+.deal-price{font:700 20px var(--font);letter-spacing:-.5px}
+.deal-market{
+  font:400 13px var(--font);color:var(--text3);
+  text-decoration:line-through;
+}
+.deal-savings{
+  font:600 12px var(--mono);color:var(--green);
+  background:var(--green-bg);
+  padding:2px 8px;border-radius:4px;
+}
+.deal-meta{
+  display:flex;align-items:center;gap:12px;
+  flex-wrap:wrap;
+}
+.deal-meta-item{
+  font:400 11px var(--mono);color:var(--text3);
+  display:flex;align-items:center;gap:4px;
+}
+.demand-dot{width:6px;height:6px;border-radius:50%}
+.demand-high{background:var(--green)}
+.demand-medium{background:var(--amber)}
+.demand-low{background:var(--text3)}
+
+/* Action column */
+.deal-actions{
+  display:flex;flex-direction:column;
+  gap:6px;padding:16px;
+  justify-content:center;
+  border-left:1px solid var(--border);
+  min-width:140px;
+}
+.deal-btn{
+  padding:8px 14px;border-radius:var(--radius);
+  font:500 12px var(--font);
+  cursor:pointer;transition:.15s;
+  border:none;text-align:center;
+  text-decoration:none;display:block;
+}
+.deal-btn-primary{
+  background:var(--green);color:#000;
+}
+.deal-btn-primary:hover{background:var(--green2)}
+.deal-btn-secondary{
+  background:transparent;color:var(--text2);
+  border:1px solid var(--border);
+}
+.deal-btn-secondary:hover{border-color:var(--text3);color:var(--text)}
+
+/* ══════ SCANNING ANIMATION ══════ */
+.scan-overlay{
+  display:none;
+  position:fixed;inset:0;z-index:200;
+  background:rgba(10,10,12,.92);
+  backdrop-filter:blur(12px);
+  flex-direction:column;
+  align-items:center;justify-content:center;
+}
+.scan-overlay.active{display:flex}
+.scan-radar{
+  width:180px;height:180px;
+  border-radius:50%;
+  border:2px solid var(--border);
+  position:relative;
+  margin-bottom:32px;
+}
+.scan-radar::before{
+  content:'';position:absolute;inset:0;
+  border-radius:50%;
+  background:conic-gradient(from 0deg,transparent 0deg,rgba(0,230,118,.15) 60deg,transparent 60deg);
+  animation:radarSweep 2s linear infinite;
+}
+@keyframes radarSweep{to{transform:rotate(360deg)}}
+.scan-radar::after{
+  content:'';position:absolute;
+  top:50%;left:50%;width:8px;height:8px;
+  margin:-4px 0 0 -4px;border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 20px rgba(0,230,118,.6);
+}
+.scan-radar .ring{
+  position:absolute;border-radius:50%;
+  border:1px solid var(--border);
+}
+.scan-radar .ring:nth-child(1){inset:20%}
+.scan-radar .ring:nth-child(2){inset:40%}
+.scan-status{
+  font:600 16px var(--font);color:var(--text);
+  margin-bottom:8px;text-align:center;
+}
+.scan-detail{
+  font:400 13px var(--mono);color:var(--text3);
+  text-align:center;
+}
+.scan-progress{
+  width:300px;height:3px;
+  background:var(--border);
+  border-radius:2px;
+  margin-top:20px;overflow:hidden;
+}
+.scan-progress-fill{
+  height:100%;background:var(--green);
+  border-radius:2px;width:0;
+  transition:width .3s;
+}
+.scan-dots{
+  display:flex;gap:16px;margin-top:24px;flex-wrap:wrap;
+  justify-content:center;max-width:400px;
+}
+.scan-dot-item{
+  display:flex;align-items:center;gap:6px;
+  font:400 11px var(--mono);color:var(--text3);
+}
+.scan-dot-item .dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--border);transition:.3s;
+}
+.scan-dot-item.done .dot{background:var(--green);box-shadow:0 0 8px rgba(0,230,118,.4)}
+.scan-dot-item.active .dot{
+  background:var(--amber);
+  animation:pulse .8s infinite;
+}
+
+/* ══════ PROFIT CALCULATOR MODAL ══════ */
+.modal-overlay{
+  position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,.6);
+  backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;padding:24px;
+}
+.modal-overlay.active{display:flex}
+.modal{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  max-width:480px;width:100%;
+  box-shadow:0 24px 48px rgba(0,0,0,.5);
+  animation:modalIn .2s var(--ease);
+}
+@keyframes modalIn{from{opacity:0;transform:scale(.96) translateY(8px)}}
+.modal-head{
+  padding:16px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.modal-head h3{font:700 16px var(--font)}
+.modal-x{
+  width:28px;height:28px;border-radius:6px;
+  border:none;background:var(--surface);
+  color:var(--text2);cursor:pointer;font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+}
+.modal-body{padding:20px}
+.m-field{margin-bottom:14px}
+.m-field label{
+  display:block;font:500 12px var(--mono);
+  color:var(--text3);margin-bottom:5px;
+}
+.m-input{
+  width:100%;padding:10px 14px;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:var(--radius);color:var(--text);
+  font:400 14px var(--font);
+}
+.m-input:focus{outline:none;border-color:var(--green-border)}
+.m-result{
+  background:var(--green-bg);
+  border:1px solid var(--green-border);
+  border-radius:var(--radius);
+  padding:16px;text-align:center;margin-top:12px;
+}
+.m-result .big{font:800 28px var(--font);color:var(--green);letter-spacing:-1px}
+.m-result .sub{font:400 12px var(--mono);color:var(--text3);margin-top:4px}
+.m-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.m-box{
+  background:var(--surface);border-radius:var(--radius);
+  padding:10px;text-align:center;
+}
+.m-box .v{font:700 16px var(--font);color:var(--text)}
+.m-box .l{font:400 10px var(--mono);color:var(--text3);margin-top:2px}
+
+/* ══════ NO RESULTS ══════ */
+.no-results{
+  text-align:center;padding:60px 20px;
+  color:var(--text3);
+}
+.no-results .icon{font-size:48px;margin-bottom:16px;opacity:.4}
+.no-results h3{font:600 18px var(--font);color:var(--text2);margin-bottom:8px}
+.no-results p{font:400 14px var(--font);max-width:400px;margin:0 auto}
+
+/* ══════ TOAST ══════ */
+.toast-box{
+  position:fixed;bottom:20px;right:20px;z-index:300;
+  display:flex;flex-direction:column;gap:8px;
+}
+.toast{
+  background:var(--surface2);color:var(--text);
+  padding:10px 18px;border-radius:var(--radius);
+  font:500 13px var(--font);
+  border:1px solid var(--border);
+  box-shadow:0 8px 24px rgba(0,0,0,.4);
+  animation:toastIn .3s var(--ease),toastOut .3s var(--ease) 2.7s forwards;
+  display:flex;align-items:center;gap:8px;
+}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px)}}
+@keyframes toastOut{to{opacity:0;transform:translateX(20px)}}
+
+/* ══════ RESPONSIVE ══════ */
+@media(max-width:900px){
+  .deal-card{grid-template-columns:auto 1fr;gap:0}
+  .deal-actions{
+    flex-direction:row;border-left:none;
+    border-top:1px solid var(--border);
+    grid-column:1/-1;min-width:unset;
+  }
+  .sources-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+}
+@media(max-width:600px){
+  .header-nav{display:none}
+  .deal-profit-bar{width:60px;padding:12px 6px}
+  .profit-pct{font-size:18px}
+  .deal-main{padding:12px 14px}
+  .config-row{flex-direction:column}
+  .config-field{min-width:unset}
+  .main{padding:16px}
+  .deal-actions{padding:10px}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <a href="#" class="logo">
+    <div class="logo-dot"></div>
+    FLIP<span>RADAR</span>
+  </a>
+  <nav class="header-nav">
+    <button class="nav-btn active" data-tab="deals">Пропозиції</button>
+    <button class="nav-btn" data-tab="sources">Джерела</button>
+    <button class="nav-btn" onclick="openCalc()">Калькулятор</button>
+  </nav>
+  <div class="header-right">
+    <button class="scan-btn" id="scanBtn" onclick="startScan()">
+      <div class="spinner"></div>
+      <span class="scan-text">⚡ Сканувати</span>
+    </button>
+  </div>
+</header>
+
+<!-- STATUS BAR -->
+<div class="status-bar" id="statusBar">
+  <div class="status-item"><div class="status-dot online"></div>OLX.ua</div>
+  <div class="status-item"><div class="status-dot online"></div>Prom.ua</div>
+  <div class="status-item"><div class="status-dot online"></div>RIA.com</div>
+  <div class="status-item"><div class="status-dot online"></div>Kleinanzeigen.de</div>
+  <div class="status-item"><div class="status-dot online"></div>Maschinensucher.de</div>
+  <div class="status-item"><div class="status-dot online"></div>Surplex.com</div>
+  <div class="status-item"><div class="status-dot online"></div>TradeMachines</div>
+  <div class="status-item"><div class="status-dot online"></div>Mascus.de</div>
+  <div class="status-item"><div class="status-dot slow"></div>Werktuigen.de</div>
+  <span style="margin-left:auto;color:var(--green)">● LIVE</span>
+</div>
+
+<main class="main">
+  <!-- SOURCES -->
+  <section class="sources-section" id="sourcesSection">
+    <div class="section-label">Джерела для пошуку — UA + DE</div>
+    <div class="sources-grid" id="sourcesGrid"></div>
+  </section>
+
+  <!-- SEARCH CONFIG -->
+  <section class="search-config">
+    <div class="config-row">
+      <div class="config-field" style="flex:2">
+        <label>Пошук обладнання</label>
+        <input type="text" class="config-input" id="searchInput" placeholder="CNC, токарний, піч, міксер, прес...">
+      </div>
+      <div class="config-field">
+        <label>Категорія</label>
+        <select class="config-select" id="categorySelect">
+          <option value="all">Всі категорії</option>
+          <option value="cnc">CNC верстати</option>
+          <option value="lathe">Токарні верстати</option>
+          <option value="mill">Фрезерні верстати</option>
+          <option value="grinder">Шліфувальні</option>
+          <option value="press">Преси</option>
+          <option value="sheet">Листовий метал</option>
+          <option value="weld">Зварювання</option>
+          <option value="plasma">Плазма / Лазер</option>
+          <option value="oven">Печі</option>
+          <option value="mixer">Міксери / Тістоміси</option>
+          <option value="display">Вітрини</option>
+          <option value="proofer">Расстоєчні шафи</option>
+          <option value="sheeter">Тістокатки</option>
+        </select>
+      </div>
+      <div class="config-field">
+        <label>Мін. прибуток</label>
+        <select class="config-select" id="minProfitSelect">
+          <option value="10">10%+</option>
+          <option value="20" selected>20%+</option>
+          <option value="30">30%+</option>
+          <option value="40">40%+ (HOT)</option>
+        </select>
+      </div>
+      <div class="config-field" style="flex:0 0 auto">
+        <label>&nbsp;</label>
+        <button class="scan-btn" onclick="startScan()" style="width:100%">🔍 Знайти угоди</button>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <div class="section-label" style="margin-bottom:6px">Швидкі фільтри</div>
+      <div class="config-chips" id="quickChips"></div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <div class="results-header" id="resultsHeader" style="display:none">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="results-title">🎯 Вигідні пропозиції</div>
+      <div class="results-count" id="resultsCount">0</div>
+    </div>
+    <div class="results-sort">
+      <button class="sort-btn active" data-sort="profit" onclick="sortDeals('profit',this)">% Прибуток</button>
+      <button class="sort-btn" data-sort="price" onclick="sortDeals('price',this)">Ціна ↑</button>
+      <button class="sort-btn" data-sort="demand" onclick="sortDeals('demand',this)">Попит</button>
+      <button class="sort-btn" data-sort="score" onclick="sortDeals('score',this)">Оцінка</button>
+    </div>
+  </div>
+  <div class="deals-list" id="dealsList">
+    <div class="no-results" id="emptyState">
+      <div class="icon">📡</div>
+      <h3>Натисніть «Сканувати» для пошуку</h3>
+      <p>FLIPRADAR просканує 9+ сайтів України та Німеччини і знайде обладнання з найкращим потенціалом перепродажу</p>
+    </div>
+  </div>
+</main>
+
+<!-- SCAN OVERLAY -->
+<div class="scan-overlay" id="scanOverlay">
+  <div class="scan-radar">
+    <div class="ring"></div>
+    <div class="ring"></div>
+  </div>
+  <div class="scan-status" id="scanStatus">Сканування джерел...</div>
+  <div class="scan-detail" id="scanDetail">Підключення до OLX.ua</div>
+  <div class="scan-progress"><div class="scan-progress-fill" id="scanProgress"></div></div>
+  <div class="scan-dots" id="scanDots"></div>
+</div>
+
+<!-- CALCULATOR MODAL -->
+<div class="modal-overlay" id="calcModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>📊 Калькулятор прибутку</h3>
+      <button class="modal-x" onclick="closeCalc()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="m-field">
+        <label>Ціна покупки</label>
+        <input type="number" class="m-input" id="cBuy" placeholder="0" oninput="calc()">
+      </div>
+      <div class="m-field">
+        <label>Ринкова ціна (або ціна продажу)</label>
+        <input type="number" class="m-input" id="cSell" placeholder="0" oninput="calc()">
+      </div>
+      <div class="m-field">
+        <label>Витрати (доставка, ремонт)</label>
+        <input type="number" class="m-input" id="cCost" value="0" oninput="calc()">
+      </div>
+      <div class="m-result">
+        <div class="big" id="cProfit">€0</div>
+        <div class="sub">Чистий прибуток</div>
+      </div>
+      <div class="m-grid">
+        <div class="m-box"><div class="v" id="cROI">0%</div><div class="l">ROI</div></div>
+        <div class="m-box"><div class="v" id="cMargin">0%</div><div class="l">Маржа</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-box" id="toastBox"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// SOURCES DATA
+// ═══════════════════════════════════════════
+const SOURCES = [
+  { id:'olx', name:'OLX.ua', country:'🇺🇦 Україна', icon:'🟢', tag:'tag-olx', active:true,
+    url: q => `https://www.olx.ua/uk/list/q-${encodeURIComponent(q)}/` },
+  { id:'prom', name:'Prom.ua', country:'🇺🇦 Україна', icon:'🟠', tag:'tag-prom', active:true,
+    url: q => `https://prom.ua/ua/search?search_term=${encodeURIComponent(q)}` },
+  { id:'ria', name:'RIA.com', country:'🇺🇦 Україна', icon:'🔵', tag:'tag-ria', active:true,
+    url: q => `https://ria.com/uk/search/?query=${encodeURIComponent(q)}` },
+  { id:'kleinanzeigen', name:'Kleinanzeigen', country:'🇩🇪 Німеччина', icon:'🟩', tag:'tag-kleinanzeigen', active:true,
+    url: q => `https://www.kleinanzeigen.de/s-${encodeURIComponent(q)}/k0` },
+  { id:'maschinensucher', name:'Maschinensucher', country:'🇩🇪 Німеччина', icon:'🔴', tag:'tag-maschinensucher', active:true,
+    url: q => `https://www.maschinensucher.de/search/?q=${encodeURIComponent(q)}` },
+  { id:'surplex', name:'Surplex.com', country:'🇩🇪 / EU', icon:'🟤', tag:'tag-surplex', active:true,
+    url: q => `https://www.surplex.com/de/m/search.html?q=${encodeURIComponent(q)}` },
+  { id:'trademachines', name:'TradeMachines', country:'🇩🇪 / EU', icon:'🔷', tag:'tag-trademachines', active:true,
+    url: q => `https://trademachines.com/search/?q=${encodeURIComponent(q)}` },
+  { id:'mascus', name:'Mascus.de', country:'🇩🇪 / EU', icon:'🟡', tag:'tag-mascus', active:true,
+    url: q => `https://www.mascus.de/search?query=${encodeURIComponent(q)}` },
+  { id:'werktuigen', name:'Werktuigen.de', country:'🇩🇪 Німеччина', icon:'🟫', tag:'tag-werktuigen', active:false,
+    url: q => `https://www.werktuigen.de/suche/${encodeURIComponent(q)}/` },
+];
+
+// ═══════════════════════════════════════════
+// MARKET PRICE DATABASE (avg resale prices)
+// ═══════════════════════════════════════════
+const MARKET_DB = {
+  cnc: { avg_eur: 28000, demand:'high', flip_weeks:'2-4', mult: 1.45 },
+  lathe: { avg_eur: 4500, demand:'high', flip_weeks:'1-2', mult: 1.40 },
+  mill: { avg_eur: 8000, demand:'high', flip_weeks:'2-3', mult: 1.38 },
+  grinder: { avg_eur: 3500, demand:'medium', flip_weeks:'3-5', mult: 1.35 },
+  press: { avg_eur: 6000, demand:'medium', flip_weeks:'2-4', mult: 1.32 },
+  sheet: { avg_eur: 5000, demand:'medium', flip_weeks:'2-4', mult: 1.30 },
+  weld: { avg_eur: 2000, demand:'high', flip_weeks:'1-2', mult: 1.28 },
+  plasma: { avg_eur: 12000, demand:'high', flip_weeks:'1-3', mult: 1.42 },
+  oven: { avg_eur: 9000, demand:'high', flip_weeks:'1-2', mult: 1.40 },
+  mixer: { avg_eur: 4000, demand:'medium', flip_weeks:'2-3', mult: 1.35 },
+  display: { avg_eur: 1800, demand:'medium', flip_weeks:'1-3', mult: 1.30 },
+  proofer: { avg_eur: 2500, demand:'low', flip_weeks:'3-5', mult: 1.25 },
+  sheeter: { avg_eur: 5500, demand:'medium', flip_weeks:'2-4', mult: 1.33 },
+};
+
+// ═══════════════════════════════════════════
+// SIMULATED DEALS DATABASE
+// (In production this would come from real scraping/API)
+// ═══════════════════════════════════════════
+const DEALS_DB = [
+  { id:1, source:'olx', title:'CNC фрезерний HAAS VF-2, 2018 рік, робочий стан', cat:'cnc',
+    price:22000, currency:'€', market:35000, condition:'Добрий',
+    location:'Київ, Україна', brand:'Haas', year:2018,
+    specs:'3-axis, 7500 RPM, 762×406×508mm, Fanuc controller',
+    demand:'high', daysListed:3, score:9.2 },
+  { id:2, source:'kleinanzeigen', title:'Drehmaschine Weiler Commodor 230, Bj.2015', cat:'lathe',
+    price:3200, currency:'€', market:5800, condition:'Gut',
+    location:'München, Deutschland', brand:'Weiler', year:2015,
+    specs:'Spitzenhöhe 230mm, Spitzenweite 750mm, 5.5kW',
+    demand:'high', daysListed:2, score:8.9 },
+  { id:3, source:'surplex', title:'Гідравлічний листозгин Amada HFE 100-3, CNC', cat:'press',
+    price:14500, currency:'€', market:24000, condition:'Gut',
+    location:'Stuttgart, Deutschland', brand:'Amada', year:2016,
+    specs:'100t, 3100mm, CNC, 7-Achsen Steuerung',
+    demand:'high', daysListed:1, score:9.5 },
+  { id:4, source:'prom', title:'Подова хлібопекарська піч Wiesheu B8, 8 рівнів', cat:'oven',
+    price:7500, currency:'€', market:12000, condition:'Добрий',
+    location:'Львів, Україна', brand:'Wiesheu', year:2017,
+    specs:'8 рівнів, газ/електро, 400×600mm, пароволожнення',
+    demand:'high', daysListed:2, score:9.4 },
+  { id:5, source:'maschinensucher', title:'Deckel Maho DMU 50 eVo CNC 5-Achs', cat:'cnc',
+    price:38000, currency:'€', market:62000, condition:'Gut',
+    location:'Hannover, Deutschland', brand:'DMG Mori', year:2014,
+    specs:'5-axis, 18000 RPM, Heidenhain iTNC 530, 500×450×400mm',
+    demand:'high', daysListed:5, score:9.0 },
+  { id:6, source:'olx', title:'Спіральний тістоміс Diosna SP 80, 80 літрів', cat:'mixer',
+    price:3400, currency:'€', market:5200, condition:'Добрий',
+    location:'Одеса, Україна', brand:'Diosna', year:2016,
+    specs:'80л, 2 швидкості, 3.0кВт, нержавіюча чаша',
+    demand:'medium', daysListed:8, score:7.8 },
+  { id:7, source:'kleinanzeigen', title:'Flachschleifmaschine ELB SWBE 010 NC-K, 2017', cat:'grinder',
+    price:6800, currency:'€', market:11500, condition:'Sehr gut',
+    location:'Düsseldorf, Deutschland', brand:'ELB', year:2017,
+    specs:'1000×400mm Tisch, NC-Steuerung, Magnetspannplatte',
+    demand:'medium', daysListed:6, score:8.2 },
+  { id:8, source:'ria', title:'Плазморіз Hypertherm PowerMax 85 + CNC стіл', cat:'plasma',
+    price:8000, currency:'€', market:13000, condition:'Добрий',
+    location:'Запоріжжя, Україна', brand:'Hypertherm', year:2019,
+    specs:'Різ 25mm, стіл 1500×3000, FineCut, THC',
+    demand:'high', daysListed:4, score:9.1 },
+  { id:9, source:'surplex', title:'Ротаційна піч Bongard 8.64E — Ліквідація пекарні', cat:'oven',
+    price:11000, currency:'€', market:18500, condition:'Gut',
+    location:'Köln, Deutschland', brand:'Bongard', year:2015,
+    specs:'Rotary, electric, 18 levels, steam, Ø600mm Rotor',
+    demand:'high', daysListed:1, score:9.6 },
+  { id:10, source:'mascus', title:'Trumpf TruLaser 3030 Fiber, 3kW, 2019', cat:'plasma',
+    price:85000, currency:'€', market:135000, condition:'Sehr gut',
+    location:'Berlin, Deutschland', brand:'Trumpf', year:2019,
+    specs:'3000×1500mm, 3kW Fiber, TruDisk, automatic nozzle',
+    demand:'high', daysListed:3, score:9.3 },
+  { id:11, source:'olx', title:'Холодильна кондитерська вітрина 2м Cold, 2020', cat:'display',
+    price:1500, currency:'€', market:2300, condition:'Як нове',
+    location:'Київ, Україна', brand:'Cold', year:2020,
+    specs:'2000×900×1350mm, +2/+8°C, LED, curved glass',
+    demand:'medium', daysListed:12, score:7.0 },
+  { id:12, source:'trademachines', title:'Stama MC 531 CNC Bearbeitungszentrum, 2016', cat:'cnc',
+    price:29000, currency:'€', market:46000, condition:'Gut',
+    location:'Frankfurt, Deutschland', brand:'Stama', year:2016,
+    specs:'4-axis, HSK-63, 15000 RPM, Siemens 840D, tool mag 30',
+    demand:'high', daysListed:7, score:8.7 },
+  { id:13, source:'prom', title:'Тістокаткова машина Rondo STM-513, автомат', cat:'sheeter',
+    price:5000, currency:'€', market:8200, condition:'Добрий',
+    location:'Харків, Україна', brand:'Rondo', year:2018,
+    specs:'600mm width, auto reverse, 2.2kW, stainless steel',
+    demand:'medium', daysListed:5, score:8.3 },
+  { id:14, source:'kleinanzeigen', title:'WIG Schweißgerät Fronius TransTig 300, 2021', cat:'weld',
+    price:1800, currency:'€', market:3100, condition:'Sehr gut',
+    location:'Hamburg, Deutschland', brand:'Fronius', year:2021,
+    specs:'300A, TIG/WIG, AC/DC, Puls, Wasserkühlung',
+    demand:'high', daysListed:3, score:8.5 },
+  { id:15, source:'maschinensucher', title:'Hydraulische Presse Schuler 250t, Doppelständer', cat:'press',
+    price:18000, currency:'€', market:30000, condition:'Gut',
+    location:'Nürnberg, Deutschland', brand:'Schuler', year:2013,
+    specs:'250t, Hub 400mm, Tisch 800×600mm, SPS Steuerung',
+    demand:'medium', daysListed:10, score:7.6 },
+  { id:16, source:'olx', title:'Токарно-гвинторізний 16К20 — після ремонту', cat:'lathe',
+    price:2200, currency:'€', market:3400, condition:'Добрий',
+    location:'Дніпро, Україна', brand:'16К20', year:2010,
+    specs:'РМЦ 1000mm, Ø400mm, 11kW, повний комплект',
+    demand:'high', daysListed:6, score:8.1 },
+  { id:17, source:'surplex', title:'Hobart Planetenmixer HL600, 60L, Edelstahl', cat:'mixer',
+    price:4200, currency:'€', market:7000, condition:'Gut',
+    location:'Wien → DE Versand', brand:'Hobart', year:2020,
+    specs:'60L, 4 speeds, timer, stainless bowl, whisk+hook+paddle',
+    demand:'high', daysListed:2, score:8.8 },
+  { id:18, source:'werktuigen', title:'Radialbohrmaschine MAS VR4, Ausleger 1250mm', cat:'mill',
+    price:2800, currency:'€', market:4600, condition:'Gut',
+    location:'Leipzig, Deutschland', brand:'MAS', year:2008,
+    specs:'Bohrleistung Ø50mm, MK4, 1250mm Ausleger, 3kW',
+    demand:'low', daysListed:18, score:6.5 },
+];
+
+const QUICK_FILTERS = [
+  'CNC', 'Токарний', 'Фрезерний', 'Прес', 'Піч', 'Міксер',
+  'Плазма', 'Шліфувальний', 'Зварювання', 'Лазер', 'Вітрина', 'Тістоміс'
+];
+
+let currentDeals = [];
+let activeSources = SOURCES.filter(s => s.active).map(s => s.id);
+let activeQuick = [];
+
+// ═══════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════
+function renderSources() {
+  document.getElementById('sourcesGrid').innerHTML = SOURCES.map(s => `
+    <div class="source-card ${s.active?'active':''}" onclick="toggleSource('${s.id}',this)">
+      <div class="source-icon">${s.icon}</div>
+      <div class="source-info">
+        <div class="source-name">${s.name}</div>
+        <div class="source-country">${s.country}</div>
+      </div>
+      <div class="source-check">✓</div>
+    </div>
+  `).join('');
+}
+
+function renderQuickChips() {
+  document.getElementById('quickChips').innerHTML = QUICK_FILTERS.map(f => `
+    <button class="c-chip" onclick="toggleQuick('${f}',this)">${f}</button>
+  `).join('');
+}
+
+function renderDeals(deals) {
+  const list = document.getElementById('dealsList');
+  const header = document.getElementById('resultsHeader');
+
+  if (deals.length === 0) {
+    header.style.display = 'none';
+    list.innerHTML = `<div class="no-results">
+      <div class="icon">📡</div>
+      <h3>Нічого не знайдено</h3>
+      <p>Спробуйте змінити фільтри або пошуковий запит</p>
+    </div>`;
+    return;
+  }
+
+  header.style.display = 'flex';
+  document.getElementById('resultsCount').textContent = deals.length + ' угод';
+
+  list.innerHTML = deals.map((d, i) => {
+    const pct = Math.round(((d.market - d.price) / d.price) * 100);
+    const savePct = Math.round(((d.market - d.price) / d.market) * 100);
+    const profit = d.market - d.price;
+    const isHot = pct >= 50;
+    const isFlip = d.demand === 'high' && pct >= 30;
+    const source = SOURCES.find(s => s.id === d.source);
+    const demandClass = d.demand === 'high' ? 'demand-high' : d.demand === 'medium' ? 'demand-medium' : 'demand-low';
+    const demandLabel = d.demand === 'high' ? 'Високий попит' : d.demand === 'medium' ? 'Середній попит' : 'Низький попит';
+    const pctClass = pct >= 40 ? 'high' : pct >= 20 ? 'medium' : 'low';
+    const mkt = MARKET_DB[d.cat] || {};
+
+    let badges = '';
+    if (isHot) badges += '<div class="deal-badge badge-hot">🔥 HOT</div>';
+    else if (isFlip) badges += '<div class="deal-badge badge-flip">⚡ FLIP</div>';
+
+    return `
+    <div class="deal-card ${isHot?'hot-deal':''}" style="animation:fadeUp .4s ${i*.04}s both">
+      <div class="deal-profit-bar">
+        <div class="profit-pct ${pctClass}">+${pct}%</div>
+        <div class="profit-label">ROI</div>
+        ${badges}
+      </div>
+      <div class="deal-main">
+        <div class="deal-top">
+          <span class="deal-source-tag ${source?.tag||''}">${source?.name||d.source}</span>
+          <div class="deal-title">${d.title}</div>
+        </div>
+        <div class="deal-specs">${d.brand} • ${d.year} • ${d.specs}</div>
+        <div class="deal-prices">
+          <span class="deal-price">€${fmt(d.price)}</span>
+          <span class="deal-market">€${fmt(d.market)}</span>
+          <span class="deal-savings">-${savePct}% від ринку</span>
+        </div>
+        <div class="deal-meta">
+          <span class="deal-meta-item">💰 Прибуток: <b style="color:var(--green)">€${fmt(profit)}</b></span>
+          <span class="deal-meta-item"><span class="demand-dot ${demandClass}"></span>${demandLabel}</span>
+          <span class="deal-meta-item">📍 ${d.location}</span>
+          <span class="deal-meta-item">📅 ${d.daysListed}д тому</span>
+          <span class="deal-meta-item">⭐ ${d.score}/10</span>
+          ${mkt.flip_weeks ? `<span class="deal-meta-item">⏱ ~${mkt.flip_weeks} тижн.</span>` : ''}
+        </div>
+      </div>
+      <div class="deal-actions">
+        <a href="${source?.url(d.title)||'#'}" target="_blank" rel="noopener" class="deal-btn deal-btn-primary">Відкрити ↗</a>
+        <button class="deal-btn deal-btn-secondary" onclick="openCalcWith(${d.price},${d.market})">📊 Калькулятор</button>
+        <button class="deal-btn deal-btn-secondary" onclick="copyDeal(${d.id})">📋 Копіювати</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════
+// SCAN ANIMATION
+// ═══════════════════════════════════════════
+async function startScan() {
+  const overlay = document.getElementById('scanOverlay');
+  const progress = document.getElementById('scanProgress');
+  const status = document.getElementById('scanStatus');
+  const detail = document.getElementById('scanDetail');
+  const dots = document.getElementById('scanDots');
+
+  const active = SOURCES.filter(s => activeSources.includes(s.id));
+  if (active.length === 0) { toast('⚠️ Оберіть хоча б одне джерело'); return; }
+
+  overlay.classList.add('active');
+  dots.innerHTML = active.map(s => `
+    <div class="scan-dot-item" id="dot-${s.id}">
+      <div class="dot"></div>${s.name}
+    </div>
+  `).join('');
+
+  const query = document.getElementById('searchInput').value || 'обладнання';
+  const minProfit = parseInt(document.getElementById('minProfitSelect').value);
+  const cat = document.getElementById('categorySelect').value;
+
+  for (let i = 0; i < active.length; i++) {
+    const s = active[i];
+    const pct = ((i + 1) / active.length * 100).toFixed(0);
+    progress.style.width = pct + '%';
+    status.textContent = `Сканування ${i + 1}/${active.length}...`;
+    detail.textContent = `Пошук на ${s.name}`;
+    document.getElementById('dot-' + s.id)?.classList.add('active');
+    await sleep(400 + Math.random() * 600);
+    document.getElementById('dot-' + s.id)?.classList.remove('active');
+    document.getElementById('dot-' + s.id)?.classList.add('done');
+  }
+
+  status.textContent = '✓ Аналіз прибутковості...';
+  detail.textContent = `Знайдено пропозиції, фільтрація за ${minProfit}%+ прибутку`;
+  await sleep(800);
+
+  // Filter deals
+  let deals = DEALS_DB.filter(d => activeSources.includes(d.source));
+
+  if (cat !== 'all') deals = deals.filter(d => d.cat === cat);
+
+  const q = query.toLowerCase();
+  if (q && q !== 'обладнання') {
+    deals = deals.filter(d =>
+      (d.title + d.brand + d.specs + d.cat).toLowerCase().includes(q)
+    );
+  }
+
+  deals = deals.filter(d => {
+    const pct = Math.round(((d.market - d.price) / d.price) * 100);
+    return pct >= minProfit;
+  });
+
+  deals.sort((a, b) => {
+    const pa = (a.market - a.price) / a.price;
+    const pb = (b.market - b.price) / b.price;
+    return pb - pa;
+  });
+
+  currentDeals = deals;
+  overlay.classList.remove('active');
+  renderDeals(deals);
+
+  const totalProfit = deals.reduce((s, d) => s + (d.market - d.price), 0);
+  toast(`✅ Знайдено ${deals.length} угод • Потенціал: €${fmt(totalProfit)}`);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ═══════════════════════════════════════════
+// SORT
+// ═══════════════════════════════════════════
+function sortDeals(by, btn) {
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  let deals = [...currentDeals];
+  switch(by) {
+    case 'profit': deals.sort((a,b) => ((b.market-b.price)/b.price) - ((a.market-a.price)/a.price)); break;
+    case 'price': deals.sort((a,b) => a.price - b.price); break;
+    case 'demand':
+      const dv = {high:3,medium:2,low:1};
+      deals.sort((a,b) => (dv[b.demand]||0) - (dv[a.demand]||0));
+      break;
+    case 'score': deals.sort((a,b) => b.score - a.score); break;
+  }
+  currentDeals = deals;
+  renderDeals(deals);
+}
+
+// ═══════════════════════════════════════════
+// INTERACTIONS
+// ═══════════════════════════════════════════
+function toggleSource(id, el) {
+  const s = SOURCES.find(x => x.id === id);
+  if (!s) return;
+  s.active = !s.active;
+  el.classList.toggle('active');
+  activeSources = SOURCES.filter(x => x.active).map(x => x.id);
+}
+
+function toggleQuick(q, btn) {
+  btn.classList.toggle('active');
+  const input = document.getElementById('searchInput');
+  if (btn.classList.contains('active')) {
+    input.value = q;
+  } else {
+    input.value = '';
+  }
+  document.querySelectorAll('.c-chip').forEach(c => {
+    if (c !== btn) c.classList.remove('active');
+  });
+}
+
+function copyDeal(id) {
+  const d = DEALS_DB.find(x => x.id === id);
+  if (!d) return;
+  const text = `${d.title}\n💰 €${fmt(d.price)} (ринок: €${fmt(d.market)})\n📈 Прибуток: €${fmt(d.market-d.price)} (+${Math.round(((d.market-d.price)/d.price)*100)}%)\n📍 ${d.location}`;
+  navigator.clipboard?.writeText(text).then(() => toast('📋 Скопійовано!'));
+}
+
+// Calculator
+function openCalc() { document.getElementById('calcModal').classList.add('active'); }
+function closeCalc() { document.getElementById('calcModal').classList.remove('active'); }
+function openCalcWith(buy, sell) {
+  document.getElementById('cBuy').value = buy;
+  document.getElementById('cSell').value = sell;
+  document.getElementById('cCost').value = 0;
+  openCalc();
+  calc();
+}
+function calc() {
+  const buy = parseFloat(document.getElementById('cBuy').value) || 0;
+  const sell = parseFloat(document.getElementById('cSell').value) || 0;
+  const cost = parseFloat(document.getElementById('cCost').value) || 0;
+  const profit = sell - buy - cost;
+  const roi = buy > 0 ? Math.round((profit / (buy + cost)) * 100) : 0;
+  const margin = sell > 0 ? Math.round((profit / sell) * 100) : 0;
+  document.getElementById('cProfit').textContent = `€${fmt(profit)}`;
+  document.getElementById('cProfit').style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('cROI').textContent = roi + '%';
+  document.getElementById('cMargin').textContent = margin + '%';
+}
+
+document.getElementById('calcModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('calcModal')) closeCalc();
+});
+
+// Helpers
+function fmt(n) { return new Intl.NumberFormat('de-DE').format(Math.round(n)); }
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.getElementById('toastBox').appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+// Keyboard
+document.getElementById('searchInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startScan();
+});
+
+// CSS animation
+const style = document.createElement('style');
+style.textContent = `@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}`;
+document.head.appendChild(style);
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+renderSources();
+renderQuickChips();
+</script>
+</body>
+</html>
